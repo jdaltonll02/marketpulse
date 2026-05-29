@@ -13,7 +13,7 @@ from openai import OpenAI
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 load_dotenv()
 
-from pipeline.synthesis.agent import _retrieve_context  # A6: ChromaDB RAG
+from pipeline.synthesis.rag import retrieve_context
 
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
@@ -93,7 +93,7 @@ def synthesise_multi_agent(
     Falls back gracefully if any specialist fails.
     """
     # A6: retrieve historical context from ChromaDB before synthesis
-    historical = _retrieve_context(ticker, "earnings signals hiring news sentiment")
+    historical = retrieve_context(ticker, "earnings signals hiring news sentiment")
 
     # Split extra_context into SEC filing text vs Yahoo Finance metrics
     filing_ctx  = ""

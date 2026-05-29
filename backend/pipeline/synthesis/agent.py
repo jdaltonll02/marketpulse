@@ -7,7 +7,6 @@ and produces a confidence score, composite signal, key risks, and recommended ac
 import json
 import os
 import sys
-from pathlib import Path
 from openai import OpenAI
 from pipeline.schema import Signals
 from dotenv import load_dotenv
@@ -16,46 +15,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 load_dotenv()
 
-# ── A6: ChromaDB vector memory ────────────────────────────────────────────────
-_CHROMA_AVAILABLE = False
-try:
-    import chromadb
-    _chroma_dir = Path(__file__).resolve().parents[2] / "data" / "chroma"
-    _chroma_dir.mkdir(parents=True, exist_ok=True)
-    _chroma_client = chromadb.PersistentClient(path=str(_chroma_dir))
-    _collection    = _chroma_client.get_or_create_collection("company_knowledge")
-    _CHROMA_AVAILABLE = True
-except ImportError:
-    pass
+from pipeline.synthesis.rag import retrieve_context, store_context  # noqa: F401
 
-
-def _retrieve_context(ticker: str, query: str, n: int = 3) -> str:
-    if not _CHROMA_AVAILABLE:
-        return ""
-    try:
-        results = _collection.query(
-            query_texts=[f"{ticker}: {query}"],
-            n_results=n,
-            where={"ticker": ticker},
-        )
-        docs = results.get("documents", [[]])[0]
-        return "\n---\n".join(docs) if docs else ""
-    except Exception:
-        return ""
-
-
-def store_context(ticker: str, doc_id: str, text: str, doc_type: str = "intelligence"):
-    """Store a document in the vector knowledge base."""
-    if not _CHROMA_AVAILABLE or not text.strip():
-        return
-    try:
-        _collection.upsert(
-            ids=[f"{ticker}_{doc_id}"],
-            documents=[text],
-            metadatas=[{"ticker": ticker, "type": doc_type}],
-        )
-    except Exception:
-        pass
+# kept as private alias for internal use within this module
+_retrieve_context = retrieve_context
 
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),

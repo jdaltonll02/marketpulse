@@ -4,7 +4,7 @@ Every component of the pipeline produces one of these typed objects.
 Validation happens automatically — no silent bad data.
 """
 from __future__ import annotations
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
@@ -79,15 +79,21 @@ class IntelligenceObject(BaseModel):
     def to_api_dict(self) -> dict:
         """Serialise for the REST API response."""
         d = self.model_dump()
-        d["generated_at"] = self.generated_at.isoformat() + "Z"
+        ts = self.generated_at
+        if ts.tzinfo is not None:
+            ts = ts.replace(tzinfo=None)  # strip tz offset before adding Z
+        d["generated_at"] = ts.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
         return d
 
     @property
     def is_fresh(self) -> bool:
         """True if the object was generated within the last hour."""
         from config import CACHE_TTL
-        age = (datetime.utcnow() - self.generated_at).total_seconds()
-        return age < CACHE_TTL
+        now = datetime.now(timezone.utc)
+        ts  = self.generated_at
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        return (now - ts).total_seconds() < CACHE_TTL
 
 
 class ValidationResult(BaseModel):

@@ -12,12 +12,9 @@ import argparse, json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-from pipeline.scrapers.serp     import fetch_ticker_news, fetch_hiring_via_serp
-from pipeline.scrapers.unlocker import fetch_sec_filing_text, fetch_yahoo_finance
-from pipeline.signals.hiring    import analyse_hiring_from_news
-from pipeline.signals.news      import analyse_news
-from pipeline.synthesis.multi_agent import synthesise_multi_agent
-from pipeline.synthesis.agent       import synthesise as synthesise_single, store_context
+from pipeline.scrapers   import fetch_ticker_news, fetch_hiring_via_serp, fetch_sec_filing_text, fetch_yahoo_finance
+from pipeline.signals    import analyse_news, analyse_hiring_from_news
+from pipeline.synthesis  import synthesise_multi_agent, synthesise as synthesise_single, store_context
 
 from pipeline.schema import (
     IntelligenceObject, Signals,

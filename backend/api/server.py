@@ -22,7 +22,7 @@ from datetime import datetime
 from pathlib import Path
 
 import config
-from pipeline.run    import run_pipeline
+from pipeline import run_pipeline
 from pipeline.schema import IntelligenceObject
 from utils.logger    import get_logger
 from api.auth        import auth_bp, init_db
@@ -42,21 +42,7 @@ JWTManager(app)
 app.register_blueprint(auth_bp)
 init_db()
 
-# ── A9: Rate limiting ─────────────────────────────────────────────────────────
-try:
-    from flask_limiter import Limiter
-    from flask_limiter.util import get_remote_address
-    limiter = Limiter(
-        app=app,
-        key_func=get_remote_address,
-        default_limits=["300 per day", "60 per hour"],
-        storage_uri="memory://",
-    )
-    _LIMITER_AVAILABLE = True
-    log.info("Rate limiting enabled")
-except ImportError:
-    _LIMITER_AVAILABLE = False
-    log.warning("flask-limiter not installed — rate limiting disabled")
+# A9: Rate limiting disabled for demo — re-enable post-hackathon with Redis storage
 
 # ── A5: Persistent JSON cache ─────────────────────────────────────────────────
 _CACHE_FILE = Path(__file__).resolve().parents[1] / "logs" / "cache.json"
@@ -145,8 +131,8 @@ def get_intelligence(ticker: str):
 @app.get("/api/intelligence/<ticker>/refresh")
 @jwt_required()
 def refresh_intelligence(ticker: str):
-    """Force re-run, bypass cache. Detects and attaches drift vs previous result."""
-    from pipeline.synthesis.drift import detect_drift
+    """Force re-run, bypass cache. Rate-limited to 30/hour to protect Bright Data credits."""
+    from pipeline.synthesis import detect_drift
     company = request.args.get("company", _resolve_company_name(ticker))
     try:
         previous = _CACHE.get(ticker.upper())

@@ -22,10 +22,20 @@ const DEFAULT_TICKERS = [
 function Dashboard() {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
-  const [watchlist, setWatchlist] = useState(DEFAULT_TICKERS);
+  const [watchlist, setWatchlist] = useState(() => {
+    try {
+      const stored = localStorage.getItem("mp_watchlist");
+      return stored ? JSON.parse(stored) : DEFAULT_TICKERS;
+    } catch { return DEFAULT_TICKERS; }
+  });
   const [data,    setData]    = useState({});
   const [loading, setLoading] = useState({});
   const [error,   setError]   = useState({});
+
+  // Persist watchlist across page refreshes
+  useEffect(() => {
+    localStorage.setItem("mp_watchlist", JSON.stringify(watchlist));
+  }, [watchlist]);
 
   useEffect(() => {
     watchlist.forEach(({ ticker, company }) => fetchTicker(ticker, company));
