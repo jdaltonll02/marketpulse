@@ -50,6 +50,15 @@ class Signals(BaseModel):
     pricing: PricingSignal
 
 
+class SignalDrift(BaseModel):
+    """Captures a change in signal between two consecutive pipeline runs."""
+    previous_signal:     Signal
+    previous_confidence: int
+    direction: Literal["improved", "deteriorated", "reversed", "confidence_shift"]
+    explanation: str
+    detected_at: str
+
+
 class IntelligenceObject(BaseModel):
     """
     The core output of the MarketPulse pipeline.
@@ -65,6 +74,7 @@ class IntelligenceObject(BaseModel):
     recommended_action: str = ""
     pipeline_version: str = "1.0.0"
     data_sources_used: list[str] = Field(default_factory=list)
+    drift: Optional[SignalDrift] = None
 
     def to_api_dict(self) -> dict:
         """Serialise for the REST API response."""

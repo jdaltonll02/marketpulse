@@ -9,17 +9,15 @@ Usage:
     python -m pipeline.run --ticker MSFT --company "Microsoft"
 """
 import argparse, json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-# ── CHANGED: removed fetch_linkedin_jobs, added fetch_hiring_via_serp
 from pipeline.scrapers.serp     import fetch_ticker_news, fetch_hiring_via_serp
 from pipeline.scrapers.unlocker import fetch_sec_filing_text, fetch_yahoo_finance
-
-# ── CHANGED: removed analyse_hiring, added analyse_hiring_from_news
-from pipeline.signals.hiring import analyse_hiring_from_news
-from pipeline.signals.news   import analyse_news
-
-from pipeline.synthesis.agent import synthesise
+from pipeline.signals.hiring    import analyse_hiring_from_news
+from pipeline.signals.news      import analyse_news
+from pipeline.synthesis.multi_agent import synthesise_multi_agent
+from pipeline.synthesis.agent       import synthesise as synthesise_single, store_context
 
 from pipeline.schema import (
     IntelligenceObject, Signals,
@@ -45,14 +43,18 @@ def run_pipeline(ticker: str, company: str) -> IntelligenceObject:
     log.info(f"Starting pipeline for {ticker} ({company})")
     started = datetime.utcnow()
 
-    # ── 1. Ingest ─────────────────────────────────────────────────────────────
-    log.info("  Step 1/4: Ingesting data...")
+    # ── 1. Ingest — A8: parallel fetch all sources simultaneously ────────────────
+    log.info("  Step 1/4: Ingesting data (parallel fetch)...")
 
-    # ── CHANGED: replaced fetch_linkedin_jobs with fetch_hiring_via_serp
-    hiring_articles = fetch_hiring_via_serp(company, days_back=30)
-    articles        = fetch_ticker_news(ticker, company, days_back=7)
-    filing_txt      = fetch_sec_filing_text(ticker)
-    yf_data         = fetch_yahoo_finance(ticker)
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        f_hiring  = pool.submit(fetch_hiring_via_serp, company, 30)
+        f_news    = pool.submit(fetch_ticker_news, ticker, company, 7)
+        f_filing  = pool.submit(fetch_sec_filing_text, ticker)
+        f_yf      = pool.submit(fetch_yahoo_finance, ticker)
+        hiring_articles = f_hiring.result()
+        articles        = f_news.result()
+        filing_txt      = f_filing.result()
+        yf_data         = f_yf.result()
 
     # ── 2. Signal analysis ────────────────────────────────────────────────────
     log.info("  Step 2/4: Analysing signals...")
@@ -78,8 +80,8 @@ def run_pipeline(ticker: str, company: str) -> IntelligenceObject:
         pricing=pricing_signal,
     )
 
-    # ── 3. Synthesise ─────────────────────────────────────────────────────────
-    log.info("  Step 3/4: Running Claude synthesis...")
+    # ── 3. Synthesise — A7: multi-agent with single-agent fallback ───────────────
+    log.info("  Step 3/4: Running multi-agent Claude synthesis...")
 
     extra_parts = []
     if filing_txt:
@@ -88,12 +90,12 @@ def run_pipeline(ticker: str, company: str) -> IntelligenceObject:
         extra_parts.append(f"Yahoo Finance metrics:\n{json.dumps(yf_data, indent=2)}")
     extra_context = "\n\n".join(extra_parts)
 
-    assessment = synthesise(
-        ticker=ticker,
-        company=company,
-        signals=signals,
-        extra_context=extra_context,
-    )
+    try:
+        assessment = synthesise_multi_agent(ticker, company, signals, extra_context)
+        log.info("  [Multi-agent] Orchestrator synthesis complete")
+    except Exception as e:
+        log.warning(f"  [Multi-agent] Failed ({e}) — falling back to single agent")
+        assessment = synthesise_single(ticker, company, signals, extra_context)
 
     # ── 4. Build and validate ─────────────────────────────────────────────────
     log.info("  Step 4/4: Building intelligence object...")
@@ -113,6 +115,7 @@ def run_pipeline(ticker: str, company: str) -> IntelligenceObject:
             "Bright Data SERP API (hiring)",
             "SEC EDGAR (direct)",
             "Yahoo Finance (yfinance)",
+            "Multi-agent synthesis (4 specialists + orchestrator)",
         ],
     )
 
@@ -123,6 +126,18 @@ def run_pipeline(ticker: str, company: str) -> IntelligenceObject:
     if result.errors:
         for e in result.errors:
             log.error(f"  ERROR: {e}")
+
+    # A6: store result in vector memory for future context retrieval
+    store_context(
+        ticker=ticker,
+        doc_id=started.strftime("%Y%m%d_%H%M"),
+        text=(
+            f"{company} ({ticker}) — {obj.composite_signal} confidence:{obj.confidence} — "
+            f"news:{obj.signals.news_sentiment.label} hiring:{obj.signals.hiring_trend.signal} — "
+            f"{obj.recommended_action}"
+        ),
+        doc_type="intelligence",
+    )
 
     elapsed = (datetime.utcnow() - started).total_seconds()
     log.info(f"Pipeline complete for {ticker} in {elapsed:.1f}s — signal: {obj.composite_signal} (confidence: {obj.confidence})")

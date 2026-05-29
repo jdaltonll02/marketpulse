@@ -24,6 +24,10 @@ yfinance>=0.2.40
 python-dotenv==1.0.1
 pydantic==2.8.2           # intelligence object schema validation
 tenacity==8.5.0           # retry logic with exponential backoff
+apscheduler==3.10.4       # A4: scheduled pipeline refreshes
+flask-limiter==3.5.0      # A9: rate limiting
+chromadb>=0.5.0           # A6: vector memory / RAG
+flask-jwt-extended==4.6.0 # authentication
 
 # ── Testing ───────────────────────────────────────────────────────────────────
 pytest==8.3.2

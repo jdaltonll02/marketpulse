@@ -1,7 +1,35 @@
 // frontend/src/components/CompanyCard.jsx
 // Displays one intelligence object — the main UI element judges will see.
 
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, TrendingUp, TrendingDown, ArrowLeftRight, Activity } from "lucide-react";
+
+const DRIFT_CONFIG = {
+  improved:         { icon: TrendingUp,       color: "text-emerald-400", bg: "bg-emerald-900/30 border-emerald-800", label: "Signal improved"    },
+  deteriorated:     { icon: TrendingDown,     color: "text-red-400",     bg: "bg-red-900/30 border-red-800",         label: "Signal deteriorated" },
+  reversed:         { icon: ArrowLeftRight,   color: "text-orange-400",  bg: "bg-orange-900/30 border-orange-800",   label: "Signal reversed"     },
+  confidence_shift: { icon: Activity,         color: "text-blue-400",    bg: "bg-blue-900/30 border-blue-800",       label: "Confidence shifted"  },
+};
+
+function DriftBanner({ drift }) {
+  if (!drift) return null;
+  const cfg = DRIFT_CONFIG[drift.direction];
+  if (!cfg) return null;
+  const Icon = cfg.icon;
+  return (
+    <div className={`mx-5 mt-3 px-4 py-3 rounded-lg border ${cfg.bg} flex items-start gap-3`}>
+      <Icon size={15} className={`${cfg.color} flex-shrink-0 mt-0.5`} />
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 mb-0.5">
+          <span className={`text-xs font-semibold ${cfg.color}`}>{cfg.label}</span>
+          <span className="text-xs text-gray-500">
+            was {drift.previous_signal} {drift.previous_confidence}%
+          </span>
+        </div>
+        <p className="text-xs text-gray-300 leading-relaxed">{drift.explanation}</p>
+      </div>
+    </div>
+  );
+}
 
 const SIGNAL_STYLES = {
   BULLISH: { bg: "bg-emerald-900/40", text: "text-emerald-400", border: "border-emerald-700" },
@@ -78,7 +106,7 @@ export default function CompanyCard({ ticker, company, data, loading, error, onR
 
   if (!data) return null;
 
-  const { signals, confidence, composite_signal, key_risks, recommended_action, generated_at } = data;
+  const { signals, confidence, composite_signal, key_risks, recommended_action, generated_at, drift } = data;
   const age = generated_at
     ? Math.round((Date.now() - new Date(generated_at).getTime()) / 60000)
     : null;
@@ -112,6 +140,8 @@ export default function CompanyCard({ ticker, company, data, loading, error, onR
           </button>
         </div>
       </div>
+
+      <DriftBanner drift={drift} />
 
       <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Left: confidence + signals */}
