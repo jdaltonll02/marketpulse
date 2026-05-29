@@ -1,0 +1,31 @@
+# ── Web framework ─────────────────────────────────────────────────────────────
+flask==3.0.3
+flask-cors==4.0.1
+
+# ── HTTP & async ──────────────────────────────────────────────────────────────
+requests==2.32.3
+httpx==0.27.2
+aiohttp==3.10.5
+
+# ── Bright Data / scraping ────────────────────────────────────────────────────
+beautifulsoup4==4.12.3
+playwright==1.46.0        # for Scraping Browser
+
+# ── Anthropic ─────────────────────────────────────────────────────────────────
+# anthropic==0.34.2
+openai>=1.30.0
+
+# ── Data processing ───────────────────────────────────────────────────────────
+pandas==2.2.2
+python-dateutil==2.9.0
+yfinance>=0.2.40
+
+# ── Config & utilities ────────────────────────────────────────────────────────
+python-dotenv==1.0.1
+pydantic==2.8.2           # intelligence object schema validation
+tenacity==8.5.0           # retry logic with exponential backoff
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+pytest==8.3.2
+pytest-asyncio==0.23.8
+responses==0.25.3         # mock HTTP requests in tests
