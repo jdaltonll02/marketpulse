@@ -1,7 +1,7 @@
 // frontend/src/components/CompanyCard.jsx
 // Displays one intelligence object — the main UI element judges will see.
 
-import { RefreshCw, TrendingUp, TrendingDown, ArrowLeftRight, Activity } from "lucide-react";
+import { RefreshCw, TrendingUp, TrendingDown, ArrowLeftRight, Activity, X } from "lucide-react";
 
 const DRIFT_CONFIG = {
   improved:         { icon: TrendingUp,       color: "text-emerald-400", bg: "bg-emerald-900/30 border-emerald-800", label: "Signal improved"    },
@@ -71,7 +71,7 @@ function SignalRow({ label, signal, detail }) {
   );
 }
 
-export default function CompanyCard({ ticker, company, data, loading, error, onRefresh }) {
+export default function CompanyCard({ ticker, company, data, loading, error, onRefresh, onRemove }) {
   if (loading) {
     return (
       <div className="rounded-xl border border-gray-800 bg-gray-900 p-6 animate-pulse">
@@ -138,6 +138,15 @@ export default function CompanyCard({ ticker, company, data, loading, error, onR
           >
             <RefreshCw size={14} />
           </button>
+          {onRemove && (
+            <button
+              onClick={onRemove}
+              className="text-gray-600 hover:text-red-400 p-1.5 rounded-lg hover:bg-gray-800 transition-colors"
+              title="Remove from watchlist"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
       </div>
 

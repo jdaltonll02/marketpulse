@@ -68,6 +68,10 @@ function Dashboard() {
     fetchTicker(t, company);
   }
 
+  function removeTicker(ticker) {
+    setWatchlist(prev => prev.filter(w => w.ticker !== ticker));
+  }
+
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <header className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
@@ -106,6 +110,7 @@ function Dashboard() {
             <CompanyCard
               key={ticker}
               ticker={ticker}
+              onRemove={() => removeTicker(ticker)}
               company={company}
               data={data[ticker]}
               loading={loading[ticker]}
