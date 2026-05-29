@@ -15,6 +15,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 load_dotenv()
 
+from pipeline.synthesis.rag import retrieve_context, store_context  # noqa: F401
+
+# kept as private alias for internal use within this module
+_retrieve_context = retrieve_context
+
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
     organization=os.getenv("OPENAI_ORG_ID"),
@@ -62,6 +67,11 @@ def synthesise(
         Dict with keys: confidence, composite_signal, key_risks,
         recommended_action, reasoning
     """
+    # A6: retrieve relevant historical context from vector memory
+    historical = _retrieve_context(ticker, "earnings signals hiring news sentiment")
+    if historical:
+        extra_context = extra_context + f"\n\nHistorical context:\n{historical}"
+
     signal_summary = {
         "news_sentiment": {
             "score":             signals.news_sentiment.score,

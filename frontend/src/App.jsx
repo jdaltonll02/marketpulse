@@ -1,15 +1,16 @@
-// frontend/src/App.jsx
-// MarketPulse AI — Main dashboard
-// Shows intelligence objects for a watchlist of tickers.
-
 import { useState, useEffect } from "react";
-import CompanyCard   from "./components/CompanyCard";
-import SearchBar     from "./components/SearchBar";
-import LoadingSpinner from "./components/LoadingSpinner";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { LogOut, Shield } from "lucide-react";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+import CompanyCard    from "./components/CompanyCard";
+import SearchBar      from "./components/SearchBar";
+import ProtectedRoute from "./components/ProtectedRoute";
+import Login          from "./pages/Login";
+import Register       from "./pages/Register";
+import AdminDashboard from "./pages/AdminDashboard";
+import { useAuth }    from "./context/AuthContext";
+import { apiFetch }   from "./api/client";
 
-// Default watchlist — shown on load
 const DEFAULT_TICKERS = [
   { ticker: "AAPL",  company: "Apple Inc."            },
   { ticker: "MSFT",  company: "Microsoft Corporation" },
@@ -18,27 +19,38 @@ const DEFAULT_TICKERS = [
   { ticker: "GOOGL", company: "Alphabet Inc."         },
 ];
 
-export default function App() {
-  const [watchlist, setWatchlist]   = useState(DEFAULT_TICKERS);
-  const [data,      setData]        = useState({});   // ticker → IntelligenceObject
-  const [loading,   setLoading]     = useState({});   // ticker → bool
-  const [error,     setError]       = useState({});   // ticker → string
+function Dashboard() {
+  const { user, logout, isAdmin } = useAuth();
+  const navigate = useNavigate();
+  const [watchlist, setWatchlist] = useState(() => {
+    try {
+      const stored = localStorage.getItem("mp_watchlist");
+      return stored ? JSON.parse(stored) : DEFAULT_TICKERS;
+    } catch { return DEFAULT_TICKERS; }
+  });
+  const [data,    setData]    = useState({});
+  const [loading, setLoading] = useState({});
+  const [error,   setError]   = useState({});
 
-  // Load all watchlist tickers on mount
+  // Persist watchlist across page refreshes
+  useEffect(() => {
+    localStorage.setItem("mp_watchlist", JSON.stringify(watchlist));
+  }, [watchlist]);
+
   useEffect(() => {
     watchlist.forEach(({ ticker, company }) => fetchTicker(ticker, company));
   }, []);
 
   async function fetchTicker(ticker, company = "", refresh = false) {
     setLoading(prev => ({ ...prev, [ticker]: true }));
-    setError(prev  => ({ ...prev, [ticker]: null }));
+    setError(prev   => ({ ...prev, [ticker]: null }));
 
     const endpoint = refresh
-      ? `${API_BASE}/api/intelligence/${ticker}/refresh`
-      : `${API_BASE}/api/intelligence/${ticker}?company=${encodeURIComponent(company)}`;
+      ? `/api/intelligence/${ticker}/refresh`
+      : `/api/intelligence/${ticker}?company=${encodeURIComponent(company)}`;
 
     try {
-      const resp = await fetch(endpoint);
+      const resp = await apiFetch(endpoint);
       if (!resp.ok) throw new Error(`API error ${resp.status}`);
       const obj = await resp.json();
       setData(prev => ({ ...prev, [ticker]: obj }));
@@ -56,29 +68,49 @@ export default function App() {
     fetchTicker(t, company);
   }
 
+  function removeTicker(ticker) {
+    setWatchlist(prev => prev.filter(w => w.ticker !== ticker));
+  }
+
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      {/* Header */}
       <header className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white">MarketPulse AI</h1>
-          <p className="text-xs text-gray-400 mt-0.5">Pre-earnings intelligence · powered by Bright Data + Claude</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Pre-earnings intelligence · powered by Bright Data + Claude
+          </p>
         </div>
-        <span className="text-xs bg-blue-900 text-blue-300 px-3 py-1 rounded-full font-medium">
-          Track 2 · Finance & Market Intelligence
-        </span>
+        <div className="flex items-center gap-3">
+          {isAdmin && (
+            <button
+              onClick={() => navigate("/admin")}
+              className="flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-300 px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors"
+            >
+              <Shield size={13} /> Admin
+            </button>
+          )}
+          <span className="text-xs text-gray-500 hidden sm:block">{user?.name || user?.email}</span>
+          <button
+            onClick={() => { logout(); navigate("/login"); }}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-400 px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors"
+          >
+            <LogOut size={13} /> Sign out
+          </button>
+          <span className="text-xs bg-blue-900 text-blue-300 px-3 py-1 rounded-full font-medium hidden md:block">
+            Track 2 · Finance & Market Intelligence
+          </span>
+        </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8">
-        {/* Search */}
         <SearchBar onAdd={addTicker} />
-
-        {/* Cards grid */}
         <div className="mt-8 grid grid-cols-1 gap-6">
           {watchlist.map(({ ticker, company }) => (
             <CompanyCard
               key={ticker}
               ticker={ticker}
+              onRemove={() => removeTicker(ticker)}
               company={company}
               data={data[ticker]}
               loading={loading[ticker]}
@@ -89,5 +121,21 @@ export default function App() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/login"    element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/" element={
+        <ProtectedRoute><Dashboard /></ProtectedRoute>
+      } />
+      <Route path="/admin" element={
+        <ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute>
+      } />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
