@@ -9,12 +9,13 @@ Endpoints:
     GET  /api/intelligence/<ticker>/refresh — force re-run the pipeline
     GET  /api/watchlist                  — list all cached tickers
 """
-import sys, os
+import sys, os, json
 sys.path.insert(0, os.path.dirname(__file__) + "/..")
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from datetime import datetime
+from pathlib import Path
 
 import config
 from pipeline.run    import run_pipeline
@@ -122,12 +123,21 @@ def watchlist():
 
 # ── Startup: pre-load seed tickers ────────────────────────────────────────────
 def _seed():
+    results = []
     for ticker, company in config.SEED_TICKERS:
         print(f"Pre-loading {ticker} ({company})...")
         try:
-            _get_or_generate(ticker, company)
+            obj = _get_or_generate(ticker, company)
+            results.append(obj.to_api_dict())
         except Exception as e:
             print(f"  Failed to seed {ticker}: {e}")
+
+    if results:
+        log_dir = Path(__file__).resolve().parents[1] / "logs"
+        log_dir.mkdir(exist_ok=True)
+        out = log_dir / f"results_{datetime.utcnow().strftime('%Y-%m-%d_%H%M')}.json"
+        out.write_text(json.dumps(results, indent=2, default=str), encoding="utf-8")
+        print(f"Results saved to {out.name}")
 
 
 if __name__ == "__main__":

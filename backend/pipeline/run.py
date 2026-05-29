@@ -8,7 +8,7 @@ Usage:
     python -m pipeline.run --ticker AAPL --company "Apple Inc."
     python -m pipeline.run --ticker MSFT --company "Microsoft"
 """
-import argparse
+import argparse, json
 from datetime import datetime
 
 # ── CHANGED: removed fetch_linkedin_jobs, added fetch_hiring_via_serp
@@ -52,7 +52,7 @@ def run_pipeline(ticker: str, company: str) -> IntelligenceObject:
     hiring_articles = fetch_hiring_via_serp(company, days_back=30)
     articles        = fetch_ticker_news(ticker, company, days_back=7)
     filing_txt      = fetch_sec_filing_text(ticker)
-    _yf_data        = fetch_yahoo_finance(ticker)
+    yf_data         = fetch_yahoo_finance(ticker)
 
     # ── 2. Signal analysis ────────────────────────────────────────────────────
     log.info("  Step 2/4: Analysing signals...")
@@ -81,11 +81,18 @@ def run_pipeline(ticker: str, company: str) -> IntelligenceObject:
     # ── 3. Synthesise ─────────────────────────────────────────────────────────
     log.info("  Step 3/4: Running Claude synthesis...")
 
+    extra_parts = []
+    if filing_txt:
+        extra_parts.append(f"SEC EDGAR filing text:\n{filing_txt[:2000]}")
+    if yf_data:
+        extra_parts.append(f"Yahoo Finance metrics:\n{json.dumps(yf_data, indent=2)}")
+    extra_context = "\n\n".join(extra_parts)
+
     assessment = synthesise(
         ticker=ticker,
         company=company,
         signals=signals,
-        extra_context=filing_txt[:2000] if filing_txt else "",
+        extra_context=extra_context,
     )
 
     # ── 4. Build and validate ─────────────────────────────────────────────────
@@ -101,7 +108,12 @@ def run_pipeline(ticker: str, company: str) -> IntelligenceObject:
         key_risks=assessment.get("key_risks", []),
         recommended_action=assessment.get("recommended_action", ""),
         # ── CHANGED: updated data sources list
-        data_sources_used=["SERP API (news)", "SERP API (hiring)", "Web Unlocker"],
+        data_sources_used=[
+            "Bright Data SERP API (news)",
+            "Bright Data SERP API (hiring)",
+            "SEC EDGAR (direct)",
+            "Yahoo Finance (yfinance)",
+        ],
     )
 
     result = validate_intelligence_object(obj)

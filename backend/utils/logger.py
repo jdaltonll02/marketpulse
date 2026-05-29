@@ -14,7 +14,12 @@ _fmt = logging.Formatter(
     datefmt="%H:%M:%S",
 )
 
-_file_handler = logging.FileHandler(_LOG_FILE, encoding="utf-8")
+class _FlushingFileHandler(logging.FileHandler):
+    def emit(self, record):
+        super().emit(record)
+        self.flush()
+
+_file_handler = _FlushingFileHandler(_LOG_FILE, encoding="utf-8")
 _file_handler.setFormatter(_fmt)
 
 _console_handler = logging.StreamHandler(sys.stdout)
