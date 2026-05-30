@@ -28,17 +28,40 @@ function Dashboard() {
       return stored ? JSON.parse(stored) : DEFAULT_TICKERS;
     } catch { return DEFAULT_TICKERS; }
   });
-  const [data,    setData]    = useState({});
-  const [loading, setLoading] = useState({});
-  const [error,   setError]   = useState({});
+  const [data,      setData]      = useState({});
+  const [loading,   setLoading]   = useState({});
+  const [error,     setError]     = useState({});
+  const [serverMsg, setServerMsg] = useState("Connecting to server…");
 
   // Persist watchlist across page refreshes
   useEffect(() => {
     localStorage.setItem("mp_watchlist", JSON.stringify(watchlist));
   }, [watchlist]);
 
+  // Warm up the server (Render free tier sleeps after inactivity),
+  // then load all companies once it's awake.
   useEffect(() => {
-    watchlist.forEach(({ ticker, company }) => fetchTicker(ticker, company));
+    let attempts = 0;
+    const MAX = 20; // 20 × 5s = 100s max wait
+
+    async function ping() {
+      try {
+        const res = await fetch("/api/health");
+        if (res.ok) {
+          setServerMsg(null);
+          watchlist.forEach(({ ticker, company }) => fetchTicker(ticker, company));
+          return;
+        }
+      } catch {}
+      attempts++;
+      if (attempts < MAX) {
+        setServerMsg(`Server waking up… (${attempts * 5}s)`);
+        setTimeout(ping, 5000);
+      } else {
+        setServerMsg("Server unavailable — try refreshing");
+      }
+    }
+    ping();
   }, []);
 
   async function fetchTicker(ticker, company = "", refresh = false) {
@@ -104,6 +127,12 @@ function Dashboard() {
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8">
+        {serverMsg && (
+          <div className="mb-6 flex items-center gap-3 px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-sm text-gray-400">
+            <div className="w-4 h-4 border-2 border-gray-600 border-t-blue-400 rounded-full animate-spin flex-shrink-0" />
+            {serverMsg}
+          </div>
+        )}
         <SearchBar onAdd={addTicker} />
         <div className="mt-8 grid grid-cols-1 gap-6">
           {watchlist.map(({ ticker, company }) => (
