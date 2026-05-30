@@ -1,0 +1,29 @@
+# Production requirements — excludes chromadb and test deps to stay within Render 512MB limit.
+# chromadb pulls in onnxruntime (~400MB) + tokenizers + huggingface-hub which OOM crashes the free tier.
+
+# ── Web framework ─────────────────────────────────────────────────────────────
+flask==3.0.3
+flask-cors==4.0.1
+flask-jwt-extended==4.6.0
+gunicorn==26.0.0
+
+# ── HTTP & scraping ───────────────────────────────────────────────────────────
+requests==2.32.3
+beautifulsoup4==4.12.3
+
+# ── AI ────────────────────────────────────────────────────────────────────────
+openai>=1.30.0
+
+# ── Database ──────────────────────────────────────────────────────────────────
+pymongo[srv]>=4.7.0
+
+# ── Data ──────────────────────────────────────────────────────────────────────
+yfinance>=0.2.40
+python-dateutil==2.9.0
+
+# ── Config & utilities ────────────────────────────────────────────────────────
+python-dotenv==1.0.1
+pydantic==2.8.2
+tenacity==8.5.0
+apscheduler==3.10.4
+bcrypt>=4.0.0
