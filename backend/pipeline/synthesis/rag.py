@@ -15,18 +15,22 @@ from dotenv import load_dotenv
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 load_dotenv()
 
+# Set DISABLE_RAG=true in production (Render) to skip the 79MB ONNX model download.
+# ChromaDB data is ephemeral on Render's free tier anyway, so RAG adds latency with no benefit.
+_DISABLED   = os.getenv("DISABLE_RAG", "false").lower() == "true"
 _AVAILABLE  = False
 _collection = None
 
-try:
-    import chromadb
-    _dir = Path(__file__).resolve().parents[2] / "data" / "chroma"
-    _dir.mkdir(parents=True, exist_ok=True)
-    _client     = chromadb.PersistentClient(path=str(_dir))
-    _collection = _client.get_or_create_collection("company_knowledge")
-    _AVAILABLE  = True
-except ImportError:
-    pass
+if not _DISABLED:
+    try:
+        import chromadb
+        _dir = Path(__file__).resolve().parents[2] / "data" / "chroma"
+        _dir.mkdir(parents=True, exist_ok=True)
+        _client     = chromadb.PersistentClient(path=str(_dir))
+        _collection = _client.get_or_create_collection("company_knowledge")
+        _AVAILABLE  = True
+    except ImportError:
+        pass
 
 
 def retrieve_context(ticker: str, query: str, n: int = 3) -> str:
