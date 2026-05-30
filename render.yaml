@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: marketpulse-api
+    runtime: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: gunicorn --chdir backend --bind 0.0.0.0:$PORT api.server:app --workers 1 --timeout 120
+    envVars:
+      - key: BRIGHTDATA_API_KEY
+        sync: false
+      - key: BRIGHTDATA_CUSTOMER_ID
+        sync: false
+      - key: SERP_ZONE
+        sync: false
+      - key: SERP_PASSWORD
+        sync: false
+      - key: UNLOCKER_ZONE
+        sync: false
+      - key: UNLOCKER_PASSWORD
+        sync: false
+      - key: PROXY_HOST
+        value: brd.superproxy.io
+      - key: PROXY_PORT
+        value: "33335"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_ORG_ID
+        sync: false
+      - key: OPENAI_BASE_URL
+        sync: false
+      - key: OPENAI_MODEL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: FLASK_PORT
+        value: "10000"
+      - key: CACHE_TTL_SECONDS
+        value: "3600"
+      - key: MAX_PARALLEL_COMPANIES
+        value: "2"
+      - key: SEED_TICKERS
+        value: "AAPL:Apple Inc.,MSFT:Microsoft Corporation,NVDA:NVIDIA Corporation,META:Meta Platforms,GOOGL:Alphabet Inc."
