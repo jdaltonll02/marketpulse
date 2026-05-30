@@ -147,25 +147,43 @@ def google_news(query: str, num: int = 20, days_back: int = 7) -> list[dict]:
 
 def fetch_ticker_news(ticker: str, company: str, days_back: int = 7) -> list[dict]:
     """
-    Fetch news for a stock ticker.
+    Fetch earnings-focused news for a ticker.
+    Primary query targets earnings/revenue/guidance; falls back to broader search
+    if fewer than 5 substantive articles are returned.
     """
-    query = f'{ticker} OR "{company}" earnings news'
-    print(f"  [SERP] Fetching news: {query}")
-    results = google_news(query, num=20, days_back=days_back)
+    primary_query = f'{ticker} "{company}" earnings revenue results guidance 2026'
+    print(f"  [SERP] Fetching news: {primary_query}")
+    results = google_news(primary_query, num=20, days_back=days_back)
+
+    if len(results) < 5:
+        fallback_query = f'{ticker} stock earnings analyst outlook 2026'
+        print(f"  [SERP] Fallback query: {fallback_query}")
+        fallback = google_news(fallback_query, num=20, days_back=30)
+        seen = {r["url"] for r in results}
+        results += [r for r in fallback if r["url"] not in seen]
+
     print(f"  [SERP] Got {len(results)} articles")
-    return results
+    return results[:20]
 
 
 def fetch_hiring_via_serp(company: str, days_back: int = 30) -> list[dict]:
     """
-    Fetch hiring signals via SERP — replaces LinkedIn scraper.
-    Searches for job postings and hiring news for a company.
+    Fetch hiring signals via SERP.
+    Primary query targets workforce/headcount news; falls back to broader hiring terms.
     """
-    query = f'"{company}" hiring jobs 2026'
-    print(f"  [SERP] Fetching hiring signals: {query}")
-    results = google_news(query, num=20, days_back=days_back)
+    primary_query = f'"{company}" hiring workforce employees headcount expansion 2026'
+    print(f"  [SERP] Fetching hiring signals: {primary_query}")
+    results = google_news(primary_query, num=20, days_back=days_back)
+
+    if len(results) < 5:
+        fallback_query = f'"{company}" jobs recruitment talent 2026'
+        print(f"  [SERP] Fallback hiring query: {fallback_query}")
+        fallback = google_news(fallback_query, num=10, days_back=60)
+        seen = {r["url"] for r in results}
+        results += [r for r in fallback if r["url"] not in seen]
+
     print(f"  [SERP] Got {len(results)} hiring articles")
-    return results
+    return results[:20]
 
 
 def fetch_competitor_news(company: str, competitors: list[str]) -> dict[str, list[dict]]:
