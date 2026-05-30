@@ -1,6 +1,7 @@
 # ── Web framework ─────────────────────────────────────────────────────────────
 flask==3.0.3
 flask-cors==4.0.1
+gunicorn==26.0.0
 
 # ── HTTP & async ──────────────────────────────────────────────────────────────
 requests==2.32.3
@@ -19,6 +20,9 @@ openai>=1.30.0
 pandas==2.2.2
 python-dateutil==2.9.0
 yfinance>=0.2.40
+
+# ── Database ──────────────────────────────────────────────────────────────────
+pymongo[srv]>=4.7.0       # MongoDB driver (srv = Atlas SRV connection string support)
 
 # ── Config & utilities ────────────────────────────────────────────────────────
 python-dotenv==1.0.1

@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(__file__) + "/..")
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path  # still used by _seed results file
 
 import config
 from pipeline import run_pipeline
@@ -32,7 +32,10 @@ log = get_logger("api.server")
 config.validate()
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True)
+
+# Allow configurable origins — set FRONTEND_URL in production (Render dashboard)
+_origins = os.getenv("FRONTEND_URL", "http://localhost:5173").split(",")
+CORS(app, origins=_origins, supports_credentials=True)
 
 # ── JWT ───────────────────────────────────────────────────────────────────────
 app.config["JWT_SECRET_KEY"] = config.SECRET_KEY
@@ -44,36 +47,38 @@ init_db()
 
 # A9: Rate limiting disabled for demo — re-enable post-hackathon with Redis storage
 
-# ── A5: Persistent JSON cache ─────────────────────────────────────────────────
-_CACHE_FILE = Path(__file__).resolve().parents[1] / "logs" / "cache.json"
+# ── A5: Persistent MongoDB cache (replaces cache.json) ────────────────────────
 _CACHE: dict[str, IntelligenceObject] = {}
 
 
 def _load_cache():
-    if not _CACHE_FILE.exists():
-        return
     try:
-        raw = json.loads(_CACHE_FILE.read_text(encoding="utf-8"))
-        for ticker, obj_dict in raw.items():
+        from api.database import get_db
+        docs = list(get_db().cache.find({}))
+        for doc in docs:
+            ticker = doc["_id"]
             try:
-                _CACHE[ticker] = IntelligenceObject.model_validate(obj_dict)
+                payload = doc["data"]
+                _CACHE[ticker] = IntelligenceObject.model_validate(payload)
             except Exception:
                 pass
-        log.info(f"Cache loaded from disk: {len(_CACHE)} entries")
+        log.info(f"Cache loaded from MongoDB: {len(_CACHE)} entries")
     except Exception as e:
-        log.warning(f"Cache load failed: {e}")
+        log.warning(f"MongoDB cache load failed: {e}")
 
 
 def _save_cache():
     try:
-        _CACHE_FILE.parent.mkdir(exist_ok=True)
-        _CACHE_FILE.write_text(
-            json.dumps({t: obj.to_api_dict() for t, obj in _CACHE.items()},
-                       indent=2, default=str),
-            encoding="utf-8",
-        )
+        from api.database import get_db
+        db = get_db()
+        for ticker, obj in _CACHE.items():
+            db.cache.replace_one(
+                {"_id": ticker},
+                {"_id": ticker, "data": obj.to_api_dict()},
+                upsert=True,
+            )
     except Exception as e:
-        log.warning(f"Cache save failed: {e}")
+        log.warning(f"MongoDB cache save failed: {e}")
 
 
 # ── Cache helpers ─────────────────────────────────────────────────────────────
