@@ -1,7 +1,93 @@
 // frontend/src/components/CompanyCard.jsx
 // Displays one intelligence object — the main UI element judges will see.
 
-import { RefreshCw, TrendingUp, TrendingDown, ArrowLeftRight, Activity, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { RefreshCw, TrendingUp, TrendingDown, ArrowLeftRight, Activity, X, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, Tooltip,
+} from "recharts";
+import { apiFetch } from "../api/client";
+
+const SIG_VAL = { BULLISH: 85, NEUTRAL: 50, BEARISH: 15 };
+
+function SignalRadar({ signals }) {
+  if (!signals) return null;
+  const data = [
+    { subject: "News",    val: SIG_VAL[signals.news_sentiment?.label]    ?? 50 },
+    { subject: "Hiring",  val: SIG_VAL[signals.hiring_trend?.signal]     ?? 50 },
+    { subject: "Filing",  val: SIG_VAL[signals.filing_language?.signal]  ?? 50 },
+    { subject: "Pricing", val: SIG_VAL[signals.pricing?.signal]          ?? 50 },
+  ];
+  return (
+    <ResponsiveContainer width="100%" height={160}>
+      <RadarChart data={data} margin={{ top: 8, right: 20, bottom: 8, left: 20 }}>
+        <PolarGrid stroke="#374151" />
+        <PolarAngleAxis dataKey="subject" tick={{ fill: "#9ca3af", fontSize: 10 }} />
+        <Radar dataKey="val" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.25} />
+      </RadarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function SentimentBar({ score }) {
+  if (score == null) return null;
+  const pct   = ((score + 1) / 2) * 100;
+  const color = score > 0.15 ? "#10b981" : score < -0.15 ? "#ef4444" : "#6b7280";
+  return (
+    <div className="mt-2 mb-3">
+      <div className="flex justify-between text-xs text-gray-500 mb-1">
+        <span>Bearish</span>
+        <span style={{ color }} className="font-medium">{score.toFixed(2)}</span>
+        <span>Bullish</span>
+      </div>
+      <div className="h-1.5 bg-gray-700 rounded-full relative">
+        <div className="absolute top-0 bottom-0 w-px bg-gray-500" style={{ left: "50%" }} />
+        <div
+          className="h-full rounded-full absolute transition-all"
+          style={{
+            backgroundColor: color,
+            left:  score < 0 ? `${pct}%` : "50%",
+            width: `${Math.abs(score) * 50}%`,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function HistoryChart({ ticker }) {
+  const [history, setHistory] = useState([]);
+  useEffect(() => {
+    apiFetch(`/api/intelligence/${ticker}/history`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setHistory(data.map(d => ({
+        t:    new Date(d.generated).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        conf: d.confidence,
+        sig:  d.signal,
+      }))))
+      .catch(() => {});
+  }, [ticker]);
+
+  if (history.length < 2) return null;
+  return (
+    <div className="mt-4">
+      <p className="text-xs text-gray-400 mb-2 font-medium uppercase tracking-wide">Confidence trend</p>
+      <ResponsiveContainer width="100%" height={80}>
+        <LineChart data={history} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+          <XAxis dataKey="t" tick={{ fill: "#6b7280", fontSize: 9 }} />
+          <YAxis domain={[0, 100]} tick={{ fill: "#6b7280", fontSize: 9 }} />
+          <Tooltip
+            contentStyle={{ background: "#111827", border: "1px solid #374151", borderRadius: 6, fontSize: 11 }}
+            labelStyle={{ color: "#9ca3af" }}
+            formatter={v => [`${v}%`, "Confidence"]}
+          />
+          <Line type="monotone" dataKey="conf" stroke="#3b82f6" strokeWidth={2} dot={{ fill: "#3b82f6", r: 3 }} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 const DRIFT_CONFIG = {
   improved:         { icon: TrendingUp,       color: "text-emerald-400", bg: "bg-emerald-900/30 border-emerald-800", label: "Signal improved"    },
@@ -152,13 +238,22 @@ export default function CompanyCard({ ticker, company, data, loading, error, onR
 
       <DriftBanner drift={drift} />
 
-      <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* Left: confidence + signals */}
+      <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-5">
+
+        {/* Col 1: Signal radar */}
+        <div>
+          <p className="text-xs text-gray-400 mb-1 font-medium uppercase tracking-wide">Signal overview</p>
+          <SignalRadar signals={signals} />
+          <HistoryChart ticker={ticker} />
+        </div>
+
+        {/* Col 2: Confidence + signal rows */}
         <div>
           <p className="text-xs text-gray-400 mb-1 font-medium uppercase tracking-wide">Confidence</p>
           <ConfidenceBar value={confidence} />
+          {signals && <SentimentBar score={signals.news_sentiment?.score} />}
 
-          <div className="mt-4">
+          <div className="mt-3">
             <p className="text-xs text-gray-400 mb-2 font-medium uppercase tracking-wide">Signal breakdown</p>
             {signals && (
               <>
@@ -170,7 +265,7 @@ export default function CompanyCard({ ticker, company, data, loading, error, onR
                 <SignalRow
                   label="Hiring trend"
                   signal={signals.hiring_trend?.signal}
-                  detail={signals.hiring_trend?.jobs_30d != null ? `${signals.hiring_trend.jobs_30d} jobs (30d)` : ""}
+                  detail={`${signals.hiring_trend?.jobs_30d ?? 0} articles`}
                 />
                 <SignalRow
                   label="Filing language"
@@ -184,9 +279,23 @@ export default function CompanyCard({ ticker, company, data, loading, error, onR
               </>
             )}
           </div>
+
+          {/* Filing key phrases */}
+          {signals?.filing_language?.key_phrases?.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wide">Filing phrases</p>
+              <ul className="space-y-1">
+                {signals.filing_language.key_phrases.slice(0, 3).map((p, i) => (
+                  <li key={i} className="text-xs text-gray-400 italic border-l-2 border-gray-700 pl-2">
+                    "{p}"
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
-        {/* Right: risks + action */}
+        {/* Col 3: Action + risks */}
         <div>
           {recommended_action && (
             <div className="mb-4">
@@ -205,6 +314,18 @@ export default function CompanyCard({ ticker, company, data, loading, error, onR
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+          {data?.data_sources_used?.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-gray-800">
+              <p className="text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">Sources</p>
+              <div className="flex flex-wrap gap-1">
+                {data.data_sources_used.map((s, i) => (
+                  <span key={i} className="text-xs px-1.5 py-0.5 bg-gray-800 text-gray-500 rounded">
+                    {s}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
         </div>

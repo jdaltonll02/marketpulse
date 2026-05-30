@@ -12,8 +12,10 @@ import argparse, json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-from pipeline.scrapers   import fetch_ticker_news, fetch_hiring_via_serp, fetch_sec_filing_text, fetch_yahoo_finance
-from pipeline.signals    import analyse_news, analyse_hiring_from_news
+from pipeline.scrapers         import fetch_ticker_news, fetch_hiring_via_serp, fetch_yahoo_finance
+from pipeline.scrapers.edgar   import fetch_filing
+from pipeline.signals          import analyse_news, analyse_hiring_from_news
+from pipeline.signals.filing   import analyse_filing
 from pipeline.synthesis  import synthesise_multi_agent, synthesise as synthesise_single, store_context
 
 from pipeline.schema import (
@@ -46,12 +48,12 @@ def run_pipeline(ticker: str, company: str) -> IntelligenceObject:
     with ThreadPoolExecutor(max_workers=4) as pool:
         f_hiring  = pool.submit(fetch_hiring_via_serp, company, 30)
         f_news    = pool.submit(fetch_ticker_news, ticker, company, 7)
-        f_filing  = pool.submit(fetch_sec_filing_text, ticker)
+        f_filing  = pool.submit(fetch_filing, ticker)
         f_yf      = pool.submit(fetch_yahoo_finance, ticker)
-        hiring_articles = f_hiring.result()
-        articles        = f_news.result()
-        filing_txt      = f_filing.result()
-        yf_data         = f_yf.result()
+        hiring_articles               = f_hiring.result()
+        articles                      = f_news.result()
+        filing_txt, form_type, filing_date = f_filing.result()
+        yf_data                       = f_yf.result()
 
     # ── 2. Signal analysis ────────────────────────────────────────────────────
     log.info("  Step 2/4: Analysing signals...")
@@ -60,14 +62,10 @@ def run_pipeline(ticker: str, company: str) -> IntelligenceObject:
     hiring_signal = analyse_hiring_from_news(hiring_articles)
     news_signal   = analyse_news(articles, company)
 
-    # TODO Day 3: implement a real filing language parser
-    filing_signal = FilingLanguageSignal(
-        guidance_tone="neutral",
-        signal="NEUTRAL",
-        key_phrases=[],
-    )
+    filing_signal  = analyse_filing(filing_txt, ticker, company, form_type)
+    log.info(f"  Filing signal: {filing_signal.signal} ({filing_signal.guidance_tone})")
 
-    # TODO Day 3: implement pricing signal from Web Unlocker
+    # Pricing signal — stub (requires competitor pricing data source)
     pricing_signal = PricingSignal(signal="NEUTRAL")
 
     signals = Signals(
@@ -82,7 +80,7 @@ def run_pipeline(ticker: str, company: str) -> IntelligenceObject:
 
     extra_parts = []
     if filing_txt:
-        extra_parts.append(f"SEC EDGAR filing text:\n{filing_txt[:2000]}")
+        extra_parts.append(f"SEC {form_type} MD&A ({filing_date}):\n{filing_txt[:2000]}")
     if yf_data:
         extra_parts.append(f"Yahoo Finance metrics:\n{json.dumps(yf_data, indent=2)}")
     extra_context = "\n\n".join(extra_parts)
@@ -110,7 +108,7 @@ def run_pipeline(ticker: str, company: str) -> IntelligenceObject:
         data_sources_used=[
             "Bright Data SERP API (news)",
             "Bright Data SERP API (hiring)",
-            "SEC EDGAR (direct)",
+            f"SEC EDGAR {form_type} ({filing_date})" if filing_date else "SEC EDGAR",
             "Yahoo Finance (yfinance)",
             "Multi-agent synthesis (4 specialists + orchestrator)",
         ],

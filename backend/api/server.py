@@ -91,7 +91,25 @@ def _get_or_generate(ticker: str, company: str = "") -> IntelligenceObject:
     obj = run_pipeline(ticker.upper(), company)
     _CACHE[ticker.upper()] = obj
     _save_cache()
+    _save_history(ticker.upper(), obj)
     return obj
+
+
+def _save_history(ticker: str, obj: IntelligenceObject):
+    """Append each run to the history collection for trend analysis."""
+    try:
+        from api.database import get_db
+        get_db().history.insert_one({
+            "ticker":     ticker,
+            "confidence": obj.confidence,
+            "signal":     obj.composite_signal,
+            "news":       obj.signals.news_sentiment.label,
+            "hiring":     obj.signals.hiring_trend.signal,
+            "filing":     obj.signals.filing_language.signal,
+            "generated":  obj.to_api_dict()["generated_at"],
+        })
+    except Exception as e:
+        log.warning(f"History save failed: {e}")
 
 
 def _resolve_company_name(ticker: str) -> str:
@@ -176,6 +194,23 @@ def batch_intelligence():
 @jwt_required()
 def watchlist():
     return jsonify({t: obj.to_api_dict() for t, obj in _CACHE.items()})
+
+
+@app.get("/api/intelligence/<ticker>/history")
+@jwt_required()
+def get_history(ticker: str):
+    """Return the last 20 pipeline runs for a ticker — used for trend charts."""
+    try:
+        from api.database import get_db
+        docs = list(
+            get_db().history
+            .find({"ticker": ticker.upper()}, {"_id": 0})
+            .sort("generated", -1)
+            .limit(20)
+        )
+        return jsonify(list(reversed(docs)))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ── A4: APScheduler — auto-refresh stale cache ────────────────────────────────

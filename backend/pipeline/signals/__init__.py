@@ -18,9 +18,11 @@ Usage
 """
 from pipeline.signals.news   import analyse_news
 from pipeline.signals.hiring import analyse_hiring_from_news, analyse_hiring
+from pipeline.signals.filing import analyse_filing
 
 __all__ = [
     "analyse_news",
     "analyse_hiring_from_news",
     "analyse_hiring",
+    "analyse_filing",
 ]
