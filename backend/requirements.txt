@@ -17,7 +17,6 @@ playwright==1.46.0        # for Scraping Browser
 openai>=1.30.0
 
 # ── Data processing ───────────────────────────────────────────────────────────
-pandas==2.2.2
 python-dateutil==2.9.0
 yfinance>=0.2.40
 
