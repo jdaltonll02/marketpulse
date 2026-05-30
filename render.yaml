@@ -3,7 +3,7 @@ services:
     name: marketpulse-api
     runtime: python
     buildCommand: pip install -r backend/requirements.txt
-    startCommand: gunicorn --chdir backend --bind 0.0.0.0:$PORT api.server:app --workers 1 --timeout 120
+    startCommand: cd backend && gunicorn --bind 0.0.0.0:$PORT api.server:app --workers 1 --timeout 120
     envVars:
       - key: BRIGHTDATA_API_KEY
         sync: false
