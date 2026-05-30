@@ -10,7 +10,6 @@ aiohttp==3.10.5
 
 # ── Bright Data / scraping ────────────────────────────────────────────────────
 beautifulsoup4==4.12.3
-playwright==1.46.0        # for Scraping Browser
 
 # ── Anthropic ─────────────────────────────────────────────────────────────────
 # anthropic==0.34.2
