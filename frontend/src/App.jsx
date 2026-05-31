@@ -127,12 +127,18 @@ function Dashboard() {
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8">
-        {serverMsg && (
-          <div className="mb-6 flex items-center gap-3 px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-sm text-gray-400">
-            <div className="w-4 h-4 border-2 border-gray-600 border-t-blue-400 rounded-full animate-spin flex-shrink-0" />
-            {serverMsg}
-          </div>
-        )}
+        {(() => {
+          const anyDataLoaded = Object.keys(data).length > 0;
+          const anyLoading    = Object.values(loading).some(Boolean);
+          const msg = serverMsg
+            || (!anyDataLoaded && anyLoading ? "Fetching data. Please wait…" : null);
+          return msg ? (
+            <div className="mb-6 flex items-center gap-3 px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-sm text-gray-400">
+              <div className="w-4 h-4 border-2 border-gray-600 border-t-blue-400 rounded-full animate-spin flex-shrink-0" />
+              {msg}
+            </div>
+          ) : null;
+        })()}
         <SearchBar onAdd={addTicker} />
         <div className="mt-8 grid grid-cols-1 gap-6">
           {watchlist.map(({ ticker, company }) => (
